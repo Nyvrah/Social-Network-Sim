@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Social Network</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #111111;
+            color: white;
+            font-family: sans-serif;
+            display: flex;
+        }
+
+        #ui-panel {
+            width: 300px;
+            background-color: #1a1a1a;
+            border-right: 2px solid #333;
+            padding: 15px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 10;
+            overflow-y: auto;
+        }
+
+        h2 { margin: 0 0 5px 0; font-size: 1.05rem; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        
+        .control-group { display: flex; flex-direction: column; gap: 6px; }
+        .control-row { display: flex; align-items: center; justify-content: space-between; }
+        
+        label { font-size: 0.8rem; color: #ccc; }
+        .val-display { color: #fff; font-weight: bold; margin-left: 4px; } 
+        
+        input[type="range"] { width: 130px; cursor: pointer; }
+        
+        .radio-group { display: flex; flex-direction: column; gap: 4px; }
+        .radio-label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; }
+
+        #tool-info {
+            background-color: #222;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: #aaa;
+            line-height: 1.3;
+            border-left: 3px solid #555;
+            margin-top: 5px;
+            transition: color 0.2s;
+        }
+
+        #stats-box {
+            background-color: #222;
+            padding: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #555;
+            font-size: 0.85rem;
+        }
+
+        button {
+            padding: 8px;
+            font-size: 0.9rem;
+            background-color: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+            width: 100%;
+        }
+        button:hover { background-color: #444; }
+        button:active { background-color: #555; }
+        button.active { background-color: #552222; border-color: #ff4444; }
+
+        canvas {
+            flex-grow: 1;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <div>
+            <h2>Interaction Tools</h2>
+            <div class="radio-group">
+                <label class="radio-label"><input type="radio" name="tool" value="gossip" checked> Gossip</label>
+                <label class="radio-label"><input type="radio" name="tool" value="virus"> Virus</label>
+                <label class="radio-label"><input type="radio" name="tool" value="move"> Move Only</label>
+            </div>
+            
+            <div id="tool-info">
+                Spreads a colorful rumor through the network. Click a node to start a wave. Rumors fade over time but don't harm the nodes.
+            </div>
+        </div>
+
+        <div>
+            <h2>Physics Parameters</h2>
+            <div class="control-group">
+                <div class="control-row">
+                    <label><span id="lbl-speed-text">Rumor Speed</span>: <span id="val-speed" class="val-display">0.05</span></label>
+                    <input type="range" id="sl-speed" min="0.001" max="0.2" step="0.001" value="0.05">
+                </div>
+                <div class="control-row">
+                    <label><span id="lbl-power-text">Rumor Reach</span>: <span id="val-power" class="val-display">0.85</span></label>
+                    <input type="range" id="sl-power" min="0.10" max="1.0" step="0.01" value="0.85">
+                </div>
+                <div class="control-row">
+                    <label><span id="lbl-decay-text">Forget Rate</span>: <span id="val-decay" class="val-display">0.98</span></label>
+                    <input type="range" id="sl-decay" min="0.9500" max="0.9999" step="0.0001" value="0.98">
+                </div>
+                <div class="control-row" id="row-death" style="display: none;">
+                    <label>Lethality: <span id="val-death" class="val-display">0.02</span></label>
+                    <input type="range" id="sl-death" min="0.0" max="0.10" step="0.001" value="0.02">
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h2>Network Generation</h2>
+            <div class="control-group">
+                <div class="control-row">
+                    <label>Population: <span id="val-population" class="val-display">85</span></label>
+                    <input type="range" id="sl-population" min="20" max="250" step="5" value="85">
+                </div>
+                <div class="control-row">
+                    <label>Clustering: <span id="val-cluster" class="val-display">0.85</span></label>
+                    <input type="range" id="sl-cluster" min="0.0" max="1.0" step="0.05" value="0.85">
+                </div>
+                <button id="btn-randomize" style="margin-top: 6px;">Randomize Network</button>
+            </div>
+        </div>
+
+        <div>
+            <h2>View Options</h2>
+            <button id="btn-degree">Show Node Degree: OFF</button>
+        </div>
+        
+        <div>
+            <h2>Live Statistics</h2>
+            <div id="stats-box">
+                <div id="stat-active" style="color: #55ff55; font-weight: bold; margin-bottom: 6px;">Talking about Rumor: 0</div>
+                <div id="stat-reached" style="color: #ccc; margin-bottom: 6px;">Total Reached: 0</div>
+                <div id="stat-immune" style="color: #44aaff; font-weight: bold; margin-bottom: 6px; display: none;">Total Immune: 0</div>
+                <div id="stat-dead" style="color: #ff4444; font-weight: bold; display: none;">Total Dead: 0</div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="simCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+
+        // --- CONFIGURATION ---
+        let NUM_NODES = 85;           
+        const CONNECTION_RANGE = 180; 
+        const MAX_PROBABILITY = 0.85;
+        const MIN_NODE_DIST = 40;     
+        const NUM_CLUSTERS = 5;       
+        const CLUSTER_RADIUS = 120;   
+        const SNAP_TO_ZERO = 0.05;
+        const CLICK_THRESHOLD = 30;   
+
+        // Visuals
+        const BASE_COLOR = [90, 90, 90];      
+        const BG_COLOR = [17, 17, 17];        
+        const DEAD_COLOR = [255, 0, 0];       
+        const FLASH_COLOR = [50, 255, 50];    
+        const IMMUNE_COLOR = [60, 160, 220];  // NEW: Bright blue for immune survivors
+        const GRADIENT_LAYERS = 4;
+        const BASE_RADIUS = 12;
+
+        // --- STATE ---
+        let nodes = [];
+        let edges = [];
+        let activeWaves = [];
+        let draggingNode = null;
+        let currentTool = 'gossip';
+        let clusterCenters = [];
+        let showDegree = false; 
+
+        // --- DOM ELEMENTS ---
+        const slSpeed = document.getElementById('sl-speed');
+        const slPower = document.getElementById('sl-power');
+        const slDecay = document.getElementById('sl-decay');
+        const slDeath = document.getElementById('sl-death');
+        const slPopulation = document.getElementById('sl-population'); 
+        const slCluster = document.getElementById('sl-cluster'); 
+        
+        const valSpeed = document.getElementById('val-speed');
+        const valPower = document.getElementById('val-power');
+        const valDecay = document.getElementById('val-decay');
+        const valDeath = document.getElementById('val-death');
+        const valPopulation = document.getElementById('val-population');
+        const valCluster = document.getElementById('val-cluster');
+
+        const lblSpeedText = document.getElementById('lbl-speed-text');
+        const lblPowerText = document.getElementById('lbl-power-text');
+        const lblDecayText = document.getElementById('lbl-decay-text');
+
+        const rowDeath = document.getElementById('row-death');
+        const btnRandomize = document.getElementById('btn-randomize'); 
+        const btnDegree = document.getElementById('btn-degree'); 
+        const radios = document.getElementsByName('tool');
+        const toolInfo = document.getElementById('tool-info'); 
+        
+        const statActive = document.getElementById('stat-active');
+        const statReached = document.getElementById('stat-reached');
+        const statImmune = document.getElementById('stat-immune'); // NEW
+        const statDead = document.getElementById('stat-dead');
+        const statsBox = document.getElementById('stats-box');
+
+        const toolDescriptions = {
+            'gossip': "Spreads a colorful rumor through the network. Click a node to start a wave. Rumors fade over time but don't harm the nodes.",
+            'virus': "Spreads a deadly infection. Infected nodes may die. Survivors become Immune (Blue) and cannot catch or spread the virus again.",
+            'move': "Allows you to click and drag nodes to rearrange the network without triggering any new waves or infections."
+        };
+
+        slSpeed.addEventListener('input', (e) => valSpeed.textContent = parseFloat(e.target.value).toFixed(3));
+        slPower.addEventListener('input', (e) => valPower.textContent = parseFloat(e.target.value).toFixed(2));
+        slDecay.addEventListener('input', (e) => valDecay.textContent = parseFloat(e.target.value).toFixed(4));
+        slDeath.addEventListener('input', (e) => valDeath.textContent = parseFloat(e.target.value).toFixed(3));
+        slPopulation.addEventListener('input', (e) => valPopulation.textContent = e.target.value);
+        slCluster.addEventListener('input', (e) => valCluster.textContent = parseFloat(e.target.value).toFixed(2));
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth - 300; 
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // --- GRAPH GENERATION MATH ---
+        function getDistance(n1, n2) {
+            return Math.hypot(n1.x - n2.x, n1.y - n2.y);
+        }
+
+        function generateClusterCenters() {
+            clusterCenters = [];
+            for(let i = 0; i < NUM_CLUSTERS; i++) {
+                clusterCenters.push({
+                    x: 150 + Math.random() * (canvas.width - 300),
+                    y: 150 + Math.random() * (canvas.height - 300)
+                });
+            }
+        }
+
+        function createNode(clusterProbability) {
+            let x, y, valid = false;
+            let clusterId = -1; 
+            
+            for (let attempt = 0; attempt < 100; attempt++) {
+                if (Math.random() < clusterProbability && clusterCenters.length > 0) {
+                    let centerIdx = Math.floor(Math.random() * clusterCenters.length);
+                    let center = clusterCenters[centerIdx];
+                    let angle = Math.random() * Math.PI * 2;
+                    let radius = Math.random() * CLUSTER_RADIUS;
+                    
+                    x = center.x + Math.cos(angle) * radius;
+                    y = center.y + Math.sin(angle) * radius;
+                    
+                    x = Math.max(20, Math.min(canvas.width - 20, x));
+                    y = Math.max(20, Math.min(canvas.height - 20, y));
+                    
+                    clusterId = centerIdx; 
+                } else {
+                    x = 20 + Math.random() * (canvas.width - 40);
+                    y = 20 + Math.random() * (canvas.height - 40);
+                    clusterId = -1; 
+                }
+
+                valid = true;
+                for (let n of nodes) {
+                    if (Math.hypot(x - n.x, y - n.y) < MIN_NODE_DIST) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if (valid) break;
+            }
+            return {
+                x, y,
+                isDead: false,
+                deathState: 0.0,
+                flashState: 1.0, 
+                clusterId: clusterId,
+                hasBeenReached: false,
+                isImmune: false,            // NEW: Tracks if they survived a virus
+                isActivelyInfected: false   // NEW: Tracks if they are currently battling a virus
+            };
+        }
+
+        function buildConnections(clusterFactor) {
+            edges = [];
+            for (let i = 0; i < nodes.length; i++) {
+                for (let j = i + 1; j < nodes.length; j++) {
+                    let dist = getDistance(nodes[i], nodes[j]);
+                    
+                    if (dist < CONNECTION_RANGE * 1.5) {
+                        let probability = Math.exp(-dist / (CONNECTION_RANGE * 0.5)) * MAX_PROBABILITY;
+                        
+                        let n1 = nodes[i];
+                        let n2 = nodes[j];
+                        
+                        if (n1.clusterId !== -1 && n2.clusterId !== -1 && n1.clusterId !== n2.clusterId) {
+                            let penalty = 1.0 - (clusterFactor * 0.95);
+                            probability *= penalty;
+                        }
+
+                        if (Math.random() < probability) {
+                            edges.push({ u: i, v: j });
+                        }
+                    }
+                }
+            }
+        }
+
+        function removeIsolates(clusterFactor) {
+            let connected = new Set();
+            edges.forEach(e => { connected.add(e.u); connected.add(e.v); });
+            nodes = nodes.filter((_, i) => connected.has(i));
+            buildConnections(clusterFactor);
+        }
+
+        function initGraph() {
+            const clusterFactor = parseFloat(slCluster.value);
+            NUM_NODES = parseInt(slPopulation.value); 
+            
+            generateClusterCenters();
+            nodes = [];
+            for (let i = 0; i < NUM_NODES; i++) {
+                nodes.push(createNode(clusterFactor));
+            }
+            buildConnections(clusterFactor);
+            removeIsolates(clusterFactor);
+            
+            activeWaves = [];
+        }
+
+        // --- UI EVENT LISTENERS ---
+        radios.forEach(r => r.addEventListener('change', (e) => {
+            currentTool = e.target.value;
+            toolInfo.textContent = toolDescriptions[currentTool];
+
+            if (currentTool === 'virus') {
+                lblSpeedText.innerText = 'Infect Rate';
+                lblPowerText.innerText = 'Viral Load';
+                lblDecayText.innerText = 'Recovery';
+                rowDeath.style.display = 'flex';
+                toolInfo.style.borderLeftColor = '#ff4444'; 
+                statsBox.style.borderLeftColor = '#ff4444';
+            } else if (currentTool === 'gossip') {
+                lblSpeedText.innerText = 'Rumor Speed';
+                lblPowerText.innerText = 'Rumor Reach';
+                lblDecayText.innerText = 'Forget Rate';
+                rowDeath.style.display = 'none';
+                toolInfo.style.borderLeftColor = '#555';
+                statsBox.style.borderLeftColor = '#555';
+            } else if (currentTool === 'move') {
+                rowDeath.style.display = 'none';
+                toolInfo.style.borderLeftColor = '#555';
+                statsBox.style.borderLeftColor = '#555';
+            }
+        }));
+
+        btnDegree.addEventListener('click', () => {
+            showDegree = !showDegree;
+            if (showDegree) {
+                btnDegree.innerText = 'Show Node Degree: ON';
+                btnDegree.style.backgroundColor = '#447744';
+                btnDegree.style.borderColor = '#66aa66';
+            } else {
+                btnDegree.innerText = 'Show Node Degree: OFF';
+                btnDegree.style.backgroundColor = '#333';
+                btnDegree.style.borderColor = '#555';
+            }
+        });
+
+        btnRandomize.addEventListener('click', () => {
+            initGraph();
+        });
+
+        // --- MOUSE EVENT LISTENERS ---
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            let minDist = Infinity;
+            let closestIdx = -1;
+
+            nodes.forEach((n, i) => {
+                let d = Math.hypot(n.x - mouseX, n.y - mouseY);
+                if (d < minDist) { minDist = d; closestIdx = i; }
+            });
+
+            if (minDist < CLICK_THRESHOLD && closestIdx !== -1 && !nodes[closestIdx].isDead) {
+                draggingNode = closestIdx;
+
+                // NEW: Prevent manually infecting an immune node!
+                if (currentTool === 'virus' && nodes[closestIdx].isImmune) {
+                    return; 
+                }
+
+                if (currentTool === 'gossip' || currentTool === 'virus') {
+                    let state = new Float32Array(nodes.length);
+                    state[closestIdx] = 1.0;
+                    
+                    let color, type;
+                    if (currentTool === 'virus') {
+                        color = [150, 255, 50]; 
+                        type = 'virus';
+                    } else {
+                        color = [
+                            50 + Math.random() * 205,
+                            50 + Math.random() * 205,
+                            50 + Math.random() * 205
+                        ];
+                        type = 'gossip';
+                    }
+
+                    activeWaves.push({ state, color, type });
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (draggingNode !== null) {
+                const rect = canvas.getBoundingClientRect();
+                nodes[draggingNode].x = e.clientX - rect.left;
+                nodes[draggingNode].y = e.clientY - rect.top;
+            }
+        });
+
+        window.addEventListener('mouseup', () => { draggingNode = null; });
+
+        // --- MAIN ANIMATION LOOP ---
+        function updateAndDraw() {
+            const currentSpeed = parseFloat(slSpeed.value);
+            const currentPower = parseFloat(slPower.value);
+            const currentDecay = parseFloat(slDecay.value);
+            const currentDeath = parseFloat(slDeath.value) * 0.3; 
+
+            ctx.fillStyle = `rgb(${BG_COLOR.join(',')})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let degrees = new Int32Array(nodes.length);
+            for (let edge of edges) {
+                let u = edge.u, v = edge.v;
+                if (!nodes[u].isDead && !nodes[v].isDead) {
+                    degrees[u]++;
+                    degrees[v]++;
+                }
+            }
+
+            // Initializes with proper colors (Immune nodes are pre-loaded as blue)
+            let finalColors = Array.from({length: nodes.length}, (_, i) => {
+                return nodes[i].isImmune ? [...IMMUNE_COLOR] : [...BASE_COLOR];
+            });
+            let maxIntensities = new Float32Array(nodes.length);
+
+            for (let w = activeWaves.length - 1; w >= 0; w--) {
+                let wave = activeWaves[w];
+                let nextState = new Float32Array(wave.state); 
+
+                // SPREADING
+                for (let edge of edges) {
+                    let u = edge.u, v = edge.v;
+                    
+                    // NEW: Determine if the virus is blocked by an immune node
+                    let uImmune = (wave.type === 'virus' && nodes[u].isImmune);
+                    let vImmune = (wave.type === 'virus' && nodes[v].isImmune);
+
+                    if (!nodes[u].isDead && !nodes[v].isDead && !uImmune && !vImmune) {
+                        if (wave.state[u] > 0.1 && wave.state[v] === 0) {
+                            if (Math.random() < currentSpeed) {
+                                nextState[v] = Math.max(nextState[v], wave.state[u] * currentPower);
+                            }
+                        } else if (wave.state[v] > 0.1 && wave.state[u] === 0) {
+                            if (Math.random() < currentSpeed) {
+                                nextState[u] = Math.max(nextState[u], wave.state[v] * currentPower);
+                            }
+                        }
+                    }
+                }
+
+                // NODE STATE UPDATES
+                let isAlive = false;
+                for (let i = 0; i < nodes.length; i++) {
+                    let n = nodes[i];
+                    nextState[i] *= currentDecay;
+                    if (nextState[i] < SNAP_TO_ZERO) nextState[i] = 0;
+                    if (nextState[i] > 1.0) nextState[i] = 1.0;
+
+                    // NEW: Viral Death & Immunity Logic
+                    if (wave.type === 'virus') {
+                        if (nextState[i] > 0.1 && !n.isDead && !n.isImmune) {
+                            n.isActivelyInfected = true; // Mark as currently infected
+                            if (Math.random() < currentDeath) {
+                                n.isDead = true;
+                                n.deathState = 1.0;
+                                n.isActivelyInfected = false;
+                                nextState[i] = 0;
+                            }
+                        } else if (nextState[i] <= 0.1 && n.isActivelyInfected && !n.isDead) {
+                            // The wave decayed and they didn't die! They are now immune.
+                            n.isImmune = true;
+                            n.isActivelyInfected = false;
+                        }
+                    }
+
+                    if (nextState[i] > 0) {
+                        isAlive = true;
+                        finalColors[i][0] += wave.color[0] * nextState[i];
+                        finalColors[i][1] += wave.color[1] * nextState[i];
+                        finalColors[i][2] += wave.color[2] * nextState[i];
+                        maxIntensities[i] = Math.max(maxIntensities[i], nextState[i]);
+                    }
+                }
+
+                wave.state = nextState;
+                if (!isAlive) activeWaves.splice(w, 1); 
+            }
+
+            // STATS CALCULATION
+            let activeCount = 0;
+            let reachedCount = 0;
+            let deadCount = 0;
+            let immuneCount = 0;
+
+            for (let i = 0; i < nodes.length; i++) {
+                let n = nodes[i];
+                
+                if (n.isDead) {
+                    deadCount++;
+                    n.hasBeenReached = true;
+                } else if (n.isImmune) {
+                    immuneCount++;
+                    n.hasBeenReached = true;
+                }
+
+                if (maxIntensities[i] > 0.05 && !n.isDead) {
+                    activeCount++;
+                    n.hasBeenReached = true;
+                }
+
+                if (n.hasBeenReached) {
+                    reachedCount++;
+                }
+            }
+
+            let activeLabel = "Talking about Rumor";
+            if (currentTool === 'virus') activeLabel = "Actively Infected";
+            else if (currentTool === 'move') activeLabel = "Active Nodes";
+
+            statActive.innerText = `${activeLabel}: ${activeCount}`;
+            statReached.innerText = `Total Reached: ${reachedCount}`;
+            statImmune.innerText = `Total Immune: ${immuneCount}`;
+            statDead.innerText = `Total Dead: ${deadCount}`;
+            
+            // Dynamic Visibility for Stats
+            if (currentTool === 'virus') {
+                statDead.style.display = 'block';
+                statImmune.style.display = 'block';
+            } else {
+                statDead.style.display = deadCount > 0 ? 'block' : 'none';
+                statImmune.style.display = immuneCount > 0 ? 'block' : 'none';
+            }
+
+            finalColors = finalColors.map(c => [
+                Math.min(255, c[0]), Math.min(255, c[1]), Math.min(255, c[2])
+            ]);
+
+            // 2. DRAW EDGES
+            for (let edge of edges) {
+                let u = edge.u, v = edge.v;
+                let n1 = nodes[u], n2 = nodes[v];
+                
+                let r = (finalColors[u][0] + finalColors[v][0]) / 2;
+                let g = (finalColors[u][1] + finalColors[v][1]) / 2;
+                let b = (finalColors[u][2] + finalColors[v][2]) / 2;
+                
+                let maxInt = Math.max(maxIntensities[u], maxIntensities[v]);
+                let alpha = 0.15 + (0.85 * maxInt); 
+
+                if (n1.isDead || n2.isDead) {
+                    let fade = 1.0;
+                    if (n1.isDead) fade = Math.min(fade, n1.deathState);
+                    if (n2.isDead) fade = Math.min(fade, n2.deathState);
+                    alpha *= fade;
+                    [r, g, b] = DEAD_COLOR;
+                }
+
+                ctx.beginPath();
+                ctx.moveTo(n1.x, n1.y);
+                ctx.lineTo(n2.x, n2.y);
+                ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+
+            // 3. DRAW NODES 
+            for (let i = 0; i < nodes.length; i++) {
+                let n = nodes[i];
+                let baseC = n.isImmune ? [...IMMUNE_COLOR] : [...BASE_COLOR];
+
+                if (n.isDead) {
+                    n.deathState *= currentDecay;
+                    if (n.deathState < 0.01) n.deathState = 0;
+                    baseC = [
+                        BG_COLOR[0] + (DEAD_COLOR[0] - BG_COLOR[0]) * n.deathState,
+                        BG_COLOR[1] + (DEAD_COLOR[1] - BG_COLOR[1]) * n.deathState,
+                        BG_COLOR[2] + (DEAD_COLOR[2] - BG_COLOR[2]) * n.deathState
+                    ];
+                } else if (n.flashState > 0) {
+                    n.flashState *= currentDecay;
+                    if (n.flashState < 0.01) n.flashState = 0;
+                    baseC = [
+                        BASE_COLOR[0] + (FLASH_COLOR[0] - BASE_COLOR[0]) * n.flashState,
+                        BASE_COLOR[1] + (FLASH_COLOR[1] - BASE_COLOR[1]) * n.flashState,
+                        BASE_COLOR[2] + (FLASH_COLOR[2] - BASE_COLOR[2]) * n.flashState
+                    ];
+                }
+
+                let targetC = (n.isDead || n.flashState > 0) ? baseC : finalColors[i];
+
+                for (let layer = 0; layer < GRADIENT_LAYERS; layer++) {
+                    let scale = 1.0 - (layer / GRADIENT_LAYERS);
+                    let radius = BASE_RADIUS * Math.pow(scale, 1.5);
+                    let factor = layer / (GRADIENT_LAYERS - 1);
+                    
+                    let lr = baseC[0] + (targetC[0] - baseC[0]) * factor;
+                    let lg = baseC[1] + (targetC[1] - baseC[1]) * factor;
+                    let lb = baseC[2] + (targetC[2] - baseC[2]) * factor;
+
+                    ctx.beginPath();
+                    ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgb(${lr},${lg},${lb})`;
+                    ctx.fill();
+                }
+
+                if (showDegree && !n.isDead) {
+                    ctx.fillStyle = 'white';
+                    ctx.font = 'bold 12px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    ctx.shadowColor = 'black';
+                    ctx.shadowBlur = 4;
+                    ctx.fillText(degrees[i], n.x, n.y);
+                    
+                    ctx.shadowBlur = 0; 
+                }
+            }
+
+            requestAnimationFrame(updateAndDraw);
+        }
+
+        initGraph();
+        updateAndDraw();
+
+    </script>
+</body>
+</html>

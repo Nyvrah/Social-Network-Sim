@@ -1,0 +1,13 @@
+NUM_NODES = 50              
+EDGE_PROBABILITY = 0.05     
+RANDOM_SEED = 42            
+
+SPREAD_POWER = 0.85         # How much intensity transfers to the next node
+DECAY_RATE = 0.96           # How much color remains per frame
+SNAP_TO_ZERO = 0.05         # If color drops below 5%, wave dies on that node
+ANIMATION_INTERVAL = 50     
+CLICK_THRESHOLD = 0.15      
+
+NODE_SIZE = 350             
+EDGE_ALPHA = 0.3            
+BASE_COLOR = np.array([0.1, 0.1, 0.1]) # Dark grey for inactive nodes
