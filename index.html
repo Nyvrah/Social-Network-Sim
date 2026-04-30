@@ -98,24 +98,24 @@
             </div>
         </div>
 
-        <div>
+        <div id="param-container">
             <h2>Physics Parameters</h2>
             <div class="control-group">
                 <div class="control-row">
-                    <label><span id="lbl-speed-text">Rumor Speed</span>: <span id="val-speed" class="val-display">0.05</span></label>
-                    <input type="range" id="sl-speed" min="0.001" max="0.2" step="0.001" value="0.05">
+                    <label><span id="lbl-speed-text">Rumor Speed</span>: <span id="val-speed" class="val-display">0.050</span></label>
+                    <input type="range" id="sl-speed" min="0.001" max="0.2" step="0.001" value="0.050">
                 </div>
                 <div class="control-row">
                     <label><span id="lbl-power-text">Rumor Reach</span>: <span id="val-power" class="val-display">0.85</span></label>
                     <input type="range" id="sl-power" min="0.10" max="1.0" step="0.01" value="0.85">
                 </div>
-                <div class="control-row">
-                    <label><span id="lbl-decay-text">Forget Rate</span>: <span id="val-decay" class="val-display">0.98</span></label>
-                    <input type="range" id="sl-decay" min="0.9500" max="0.9999" step="0.0001" value="0.98">
+                <div class="control-row" id="row-decay">
+                    <label><span id="lbl-decay-text">Forget Rate</span>: <span id="val-decay" class="val-display">0.020</span></label>
+                    <input type="range" id="sl-decay" min="0.001" max="0.100" step="0.001" value="0.020">
                 </div>
                 <div class="control-row" id="row-death" style="display: none;">
-                    <label>Lethality: <span id="val-death" class="val-display">0.02</span></label>
-                    <input type="range" id="sl-death" min="0.0" max="0.10" step="0.001" value="0.02">
+                    <label>Lethality: <span id="val-death" class="val-display">0.20</span></label>
+                    <input type="range" id="sl-death" min="0.0" max="1.0" step="0.01" value="0.20">
                 </div>
             </div>
         </div>
@@ -172,7 +172,7 @@
         const BG_COLOR = [17, 17, 17];        
         const DEAD_COLOR = [255, 0, 0];       
         const FLASH_COLOR = [50, 255, 50];    
-        const IMMUNE_COLOR = [60, 160, 220];  // NEW: Bright blue for immune survivors
+        const IMMUNE_COLOR = [60, 160, 220];  
         const GRADIENT_LAYERS = 4;
         const BASE_RADIUS = 12;
 
@@ -202,9 +202,11 @@
 
         const lblSpeedText = document.getElementById('lbl-speed-text');
         const lblPowerText = document.getElementById('lbl-power-text');
-        const lblDecayText = document.getElementById('lbl-decay-text');
 
+        const rowDecay = document.getElementById('row-decay'); 
         const rowDeath = document.getElementById('row-death');
+        const paramContainer = document.getElementById('param-container'); // NEW
+
         const btnRandomize = document.getElementById('btn-randomize'); 
         const btnDegree = document.getElementById('btn-degree'); 
         const radios = document.getElementsByName('tool');
@@ -212,20 +214,20 @@
         
         const statActive = document.getElementById('stat-active');
         const statReached = document.getElementById('stat-reached');
-        const statImmune = document.getElementById('stat-immune'); // NEW
+        const statImmune = document.getElementById('stat-immune'); 
         const statDead = document.getElementById('stat-dead');
         const statsBox = document.getElementById('stats-box');
 
         const toolDescriptions = {
             'gossip': "Spreads a colorful rumor through the network. Click a node to start a wave. Rumors fade over time but don't harm the nodes.",
-            'virus': "Spreads a deadly infection. Infected nodes may die. Survivors become Immune (Blue) and cannot catch or spread the virus again.",
+            'virus': "Spreads a deadly infection. Lethality sets the total probability a node dies. Survivors become Immune (Blue).",
             'move': "Allows you to click and drag nodes to rearrange the network without triggering any new waves or infections."
         };
 
         slSpeed.addEventListener('input', (e) => valSpeed.textContent = parseFloat(e.target.value).toFixed(3));
         slPower.addEventListener('input', (e) => valPower.textContent = parseFloat(e.target.value).toFixed(2));
-        slDecay.addEventListener('input', (e) => valDecay.textContent = parseFloat(e.target.value).toFixed(4));
-        slDeath.addEventListener('input', (e) => valDeath.textContent = parseFloat(e.target.value).toFixed(3));
+        slDecay.addEventListener('input', (e) => valDecay.textContent = parseFloat(e.target.value).toFixed(3));
+        slDeath.addEventListener('input', (e) => valDeath.textContent = parseFloat(e.target.value).toFixed(2));
         slPopulation.addEventListener('input', (e) => valPopulation.textContent = e.target.value);
         slCluster.addEventListener('input', (e) => valCluster.textContent = parseFloat(e.target.value).toFixed(2));
 
@@ -236,7 +238,6 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // --- GRAPH GENERATION MATH ---
         function getDistance(n1, n2) {
             return Math.hypot(n1.x - n2.x, n1.y - n2.y);
         }
@@ -291,8 +292,10 @@
                 flashState: 1.0, 
                 clusterId: clusterId,
                 hasBeenReached: false,
-                isImmune: false,            // NEW: Tracks if they survived a virus
-                isActivelyInfected: false   // NEW: Tracks if they are currently battling a virus
+                isImmune: false,            
+                isActivelyInfected: false,
+                destinedToDie: false,
+                immunityState: 0.0 
             };
         }
 
@@ -349,21 +352,23 @@
             toolInfo.textContent = toolDescriptions[currentTool];
 
             if (currentTool === 'virus') {
+                paramContainer.style.display = 'block'; // Ensure it's shown
                 lblSpeedText.innerText = 'Infect Rate';
                 lblPowerText.innerText = 'Viral Load';
-                lblDecayText.innerText = 'Recovery';
-                rowDeath.style.display = 'flex';
+                rowDecay.style.display = 'none'; 
+                rowDeath.style.display = 'flex'; 
                 toolInfo.style.borderLeftColor = '#ff4444'; 
                 statsBox.style.borderLeftColor = '#ff4444';
             } else if (currentTool === 'gossip') {
+                paramContainer.style.display = 'block'; // Ensure it's shown
                 lblSpeedText.innerText = 'Rumor Speed';
                 lblPowerText.innerText = 'Rumor Reach';
-                lblDecayText.innerText = 'Forget Rate';
+                rowDecay.style.display = 'flex'; 
                 rowDeath.style.display = 'none';
                 toolInfo.style.borderLeftColor = '#555';
                 statsBox.style.borderLeftColor = '#555';
             } else if (currentTool === 'move') {
-                rowDeath.style.display = 'none';
+                paramContainer.style.display = 'none'; // Hide the entire parameters section
                 toolInfo.style.borderLeftColor = '#555';
                 statsBox.style.borderLeftColor = '#555';
             }
@@ -403,7 +408,6 @@
             if (minDist < CLICK_THRESHOLD && closestIdx !== -1 && !nodes[closestIdx].isDead) {
                 draggingNode = closestIdx;
 
-                // NEW: Prevent manually infecting an immune node!
                 if (currentTool === 'virus' && nodes[closestIdx].isImmune) {
                     return; 
                 }
@@ -444,8 +448,9 @@
         function updateAndDraw() {
             const currentSpeed = parseFloat(slSpeed.value);
             const currentPower = parseFloat(slPower.value);
-            const currentDecay = parseFloat(slDecay.value);
-            const currentDeath = parseFloat(slDeath.value) * 0.3; 
+            
+            const gossipDecay = 1.0 - parseFloat(slDecay.value); 
+            const totalLethality = parseFloat(slDeath.value); 
 
             ctx.fillStyle = `rgb(${BG_COLOR.join(',')})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -459,21 +464,35 @@
                 }
             }
 
-            // Initializes with proper colors (Immune nodes are pre-loaded as blue)
+            for (let i = 0; i < nodes.length; i++) {
+                let n = nodes[i];
+                if (n.isImmune || (n.isActivelyInfected && !n.destinedToDie)) {
+                    n.immunityState += 0.005; 
+                    if (n.immunityState > 1.0) n.immunityState = 1.0;
+                }
+            }
+
             let finalColors = Array.from({length: nodes.length}, (_, i) => {
-                return nodes[i].isImmune ? [...IMMUNE_COLOR] : [...BASE_COLOR];
+                let n = nodes[i];
+                return [
+                    BASE_COLOR[0] + (IMMUNE_COLOR[0] - BASE_COLOR[0]) * n.immunityState,
+                    BASE_COLOR[1] + (IMMUNE_COLOR[1] - BASE_COLOR[1]) * n.immunityState,
+                    BASE_COLOR[2] + (IMMUNE_COLOR[2] - BASE_COLOR[2]) * n.immunityState
+                ];
             });
+
             let maxIntensities = new Float32Array(nodes.length);
 
             for (let w = activeWaves.length - 1; w >= 0; w--) {
                 let wave = activeWaves[w];
                 let nextState = new Float32Array(wave.state); 
+                
+                let waveDecayMultiplier = (wave.type === 'virus') ? 0.992 : gossipDecay;
 
                 // SPREADING
                 for (let edge of edges) {
                     let u = edge.u, v = edge.v;
                     
-                    // NEW: Determine if the virus is blocked by an immune node
                     let uImmune = (wave.type === 'virus' && nodes[u].isImmune);
                     let vImmune = (wave.type === 'virus' && nodes[v].isImmune);
 
@@ -494,24 +513,28 @@
                 let isAlive = false;
                 for (let i = 0; i < nodes.length; i++) {
                     let n = nodes[i];
-                    nextState[i] *= currentDecay;
+                    nextState[i] *= waveDecayMultiplier; 
+                    
                     if (nextState[i] < SNAP_TO_ZERO) nextState[i] = 0;
                     if (nextState[i] > 1.0) nextState[i] = 1.0;
 
-                    // NEW: Viral Death & Immunity Logic
                     if (wave.type === 'virus') {
                         if (nextState[i] > 0.1 && !n.isDead && !n.isImmune) {
-                            n.isActivelyInfected = true; // Mark as currently infected
-                            if (Math.random() < currentDeath) {
+                            if (!n.isActivelyInfected) {
+                                n.isActivelyInfected = true; 
+                                n.destinedToDie = Math.random() < totalLethality; 
+                            }
+                        } 
+                        
+                        if (nextState[i] <= 0.1 && n.isActivelyInfected && !n.isDead) {
+                            n.isActivelyInfected = false;
+                            if (n.destinedToDie) {
                                 n.isDead = true;
                                 n.deathState = 1.0;
-                                n.isActivelyInfected = false;
-                                nextState[i] = 0;
+                                nextState[i] = 0; 
+                            } else {
+                                n.isImmune = true; 
                             }
-                        } else if (nextState[i] <= 0.1 && n.isActivelyInfected && !n.isDead) {
-                            // The wave decayed and they didn't die! They are now immune.
-                            n.isImmune = true;
-                            n.isActivelyInfected = false;
                         }
                     }
 
@@ -564,7 +587,6 @@
             statImmune.innerText = `Total Immune: ${immuneCount}`;
             statDead.innerText = `Total Dead: ${deadCount}`;
             
-            // Dynamic Visibility for Stats
             if (currentTool === 'virus') {
                 statDead.style.display = 'block';
                 statImmune.style.display = 'block';
@@ -608,10 +630,15 @@
             // 3. DRAW NODES 
             for (let i = 0; i < nodes.length; i++) {
                 let n = nodes[i];
-                let baseC = n.isImmune ? [...IMMUNE_COLOR] : [...BASE_COLOR];
+                
+                let baseC = [
+                    BASE_COLOR[0] + (IMMUNE_COLOR[0] - BASE_COLOR[0]) * n.immunityState,
+                    BASE_COLOR[1] + (IMMUNE_COLOR[1] - BASE_COLOR[1]) * n.immunityState,
+                    BASE_COLOR[2] + (IMMUNE_COLOR[2] - BASE_COLOR[2]) * n.immunityState
+                ];
 
                 if (n.isDead) {
-                    n.deathState *= currentDecay;
+                    n.deathState *= 0.95; 
                     if (n.deathState < 0.01) n.deathState = 0;
                     baseC = [
                         BG_COLOR[0] + (DEAD_COLOR[0] - BG_COLOR[0]) * n.deathState,
@@ -619,7 +646,7 @@
                         BG_COLOR[2] + (DEAD_COLOR[2] - BG_COLOR[2]) * n.deathState
                     ];
                 } else if (n.flashState > 0) {
-                    n.flashState *= currentDecay;
+                    n.flashState *= 0.85; 
                     if (n.flashState < 0.01) n.flashState = 0;
                     baseC = [
                         BASE_COLOR[0] + (FLASH_COLOR[0] - BASE_COLOR[0]) * n.flashState,
