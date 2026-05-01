@@ -169,7 +169,7 @@
         <button id="btn-help">Help</button>
 
         <div>
-            <h2>Interaction Tools</h2>
+            <h2>Tools</h2>
             <div class="radio-group">
                 <label class="radio-label"><input type="radio" name="tool" value="gossip" checked> Gossip</label>
                 <label class="radio-label"><input type="radio" name="tool" value="virus"> Virus</label>
@@ -182,7 +182,7 @@
         </div>
 
         <div id="param-container">
-            <h2>Physics Parameters</h2>
+            <h2>Parameters</h2>
             <div class="control-group">
                 <div class="control-row">
                     <label><span id="lbl-speed-text">Rumor Speed</span>: <span id="val-speed" class="val-display">0.050</span></label>
@@ -237,9 +237,6 @@
     <canvas id="simCanvas"></canvas>
 
     <script>
-        // ==========================================
-        // TEXT EDITING: EDIT THE POPUP TEXT HERE
-        // ==========================================
         const MODAL_TEXT = {
             title: "Social Network Simulator",
             intro: "This simulation visualizes how information and contagions spread through social networks.",
@@ -253,12 +250,10 @@
             outro: "Harvyn Lim, SOCIOLOGY 110",
             buttonLabel: "Done"
         };
-        // ==========================================
 
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d', { alpha: false });
 
-        // --- CONFIGURATION ---
         let NUM_NODES = 85;           
         const CONNECTION_RANGE = 180; 
         const MAX_PROBABILITY = 0.85;
@@ -268,7 +263,6 @@
         const SNAP_TO_ZERO = 0.05;
         const CLICK_THRESHOLD = 30;   
 
-        // Visuals
         const BASE_COLOR = [90, 90, 90];      
         const BG_COLOR = [17, 17, 17];        
         const DEAD_COLOR = [255, 0, 0];       
@@ -277,7 +271,6 @@
         const GRADIENT_LAYERS = 4;
         const BASE_RADIUS = 12;
 
-        // --- STATE ---
         let nodes = [];
         let edges = [];
         let activeWaves = [];
@@ -286,7 +279,6 @@
         let clusterCenters = [];
         let showDegree = false; 
 
-        // --- DOM ELEMENTS ---
         const slSpeed = document.getElementById('sl-speed');
         const slPower = document.getElementById('sl-power');
         const slDecay = document.getElementById('sl-decay');
@@ -324,12 +316,11 @@
         const btnHelp = document.getElementById('btn-help');
 
         const toolDescriptions = {
-            'gossip': "Spreads a colorful rumor through the network. Click a node to start a wave. Rumors fade over time.",
+            'gossip': "Spreads a rumor through the network. Click a node to start a wave. Rumors fade over time.",
             'virus': "Spreads a viral infection. Lethality sets the probability a node dies. Survivors become immune (Blue).",
-            'move': "Allows you to click and drag nodes to rearrange the network without triggering any new waves or infections."
+            'move': "Click and drag nodes to rearrange the network"
         };
 
-        // --- POPULATE MODAL CONTENT DYNAMICALLY ---
         function buildModal() {
             let bulletsHTML = MODAL_TEXT.bulletPoints.map(point => `<li>${point}</li>`).join('');
             
@@ -342,7 +333,6 @@
                 <button id="btn-close-modal">${MODAL_TEXT.buttonLabel}</button>
             `;
 
-            // Attach event listener to the newly created button
             document.getElementById('btn-close-modal').addEventListener('click', () => {
                 welcomeModal.style.display = 'none';
             });
@@ -475,7 +465,6 @@
             activeWaves = [];
         }
 
-        // --- UI EVENT LISTENERS ---
         radios.forEach(r => r.addEventListener('change', (e) => {
             currentTool = e.target.value;
             toolInfo.textContent = toolDescriptions[currentTool];
@@ -520,7 +509,6 @@
             initGraph();
         });
 
-        // --- MOUSE EVENT LISTENERS ---
         canvas.addEventListener('mousedown', (e) => {
             if (welcomeModal.style.display === 'flex') return;
 
@@ -575,7 +563,6 @@
 
         window.addEventListener('mouseup', () => { draggingNode = null; });
 
-        // --- MAIN ANIMATION LOOP ---
         function updateAndDraw() {
             const currentSpeed = parseFloat(slSpeed.value);
             const currentPower = parseFloat(slPower.value);
@@ -620,7 +607,6 @@
                 
                 let waveDecayMultiplier = (wave.type === 'virus') ? 0.992 : gossipDecay;
 
-                // SPREADING
                 for (let edge of edges) {
                     let u = edge.u, v = edge.v;
                     
@@ -640,7 +626,6 @@
                     }
                 }
 
-                // NODE STATE UPDATES
                 let isAlive = false;
                 for (let i = 0; i < nodes.length; i++) {
                     let n = nodes[i];
@@ -682,7 +667,6 @@
                 if (!isAlive) activeWaves.splice(w, 1); 
             }
 
-            // STATS CALCULATION
             let activeCount = 0;
             let reachedCount = 0;
             let deadCount = 0;
@@ -730,7 +714,6 @@
                 Math.min(255, c[0]), Math.min(255, c[1]), Math.min(255, c[2])
             ]);
 
-            // 2. DRAW EDGES
             for (let edge of edges) {
                 let u = edge.u, v = edge.v;
                 let n1 = nodes[u], n2 = nodes[v];
@@ -758,7 +741,6 @@
                 ctx.stroke();
             }
 
-            // 3. DRAW NODES 
             for (let i = 0; i < nodes.length; i++) {
                 let n = nodes[i];
                 
