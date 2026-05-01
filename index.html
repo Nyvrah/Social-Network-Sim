@@ -80,11 +80,94 @@
             flex-grow: 1;
             cursor: crosshair;
         }
+
+        #welcome-modal {
+            display: flex; 
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 100; 
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background-color: #1a1a1a;
+            border: 2px solid #444;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            line-height: 1.5;
+        }
+
+        .modal-content h1 {
+            margin-top: 0;
+            color: #fff;
+            border-bottom: 2px solid #555;
+            padding-bottom: 10px;
+        }
+
+        .modal-content h3 {
+            color: #aaa;
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+
+        .modal-content p {
+            color: #ddd;
+            font-size: 0.95rem;
+            margin-top: 0;
+        }
+
+        .modal-content ul {
+            color: #ddd;
+            font-size: 0.95rem;
+            padding-left: 20px;
+        }
+
+        .modal-content li {
+            margin-bottom: 8px;
+        }
+
+        .modal-content strong {
+            color: #fff;
+        }
+
+        #btn-close-modal {
+            background-color: #447744;
+            border-color: #66aa66;
+            margin-top: 20px;
+            font-size: 1rem;
+            padding: 12px;
+        }
+        #btn-close-modal:hover { background-color: #558855; }
+
+        #btn-help {
+            background-color: #222;
+            border-color: #444;
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+        #btn-help:hover { background-color: #333; color: #fff; }
+
     </style>
 </head>
 <body>
 
+    <div id="welcome-modal">
+        <div class="modal-content" id="modal-container">
+            </div>
+    </div>
+
     <div id="ui-panel">
+        <button id="btn-help">Help</button>
+
         <div>
             <h2>Interaction Tools</h2>
             <div class="radio-group">
@@ -154,6 +237,24 @@
     <canvas id="simCanvas"></canvas>
 
     <script>
+        // ==========================================
+        // TEXT EDITING: EDIT THE POPUP TEXT HERE
+        // ==========================================
+        const MODAL_TEXT = {
+            title: "Social Network Simulator",
+            intro: "This simulation visualizes how information and contagions spread through social networks.",
+            sectionHeading: "Sociology Concepts:",
+            bulletPoints: [
+                "<strong>Node Degree:</strong> How many connections an individual/node has",
+                "<strong>Clustering:</strong> Tendency for groups of closely connected nodes to form.",
+                "<strong>Spread of information:</strong> How information travels between nodes and clusters.",
+                "<strong>Viral Infections:</strong> Spread of viruses changes with network structure."
+            ],
+            outro: "Harvyn Lim, SOCIOLOGY 110",
+            buttonLabel: "Done"
+        };
+        // ==========================================
+
         const canvas = document.getElementById('simCanvas');
         const ctx = canvas.getContext('2d', { alpha: false });
 
@@ -205,7 +306,7 @@
 
         const rowDecay = document.getElementById('row-decay'); 
         const rowDeath = document.getElementById('row-death');
-        const paramContainer = document.getElementById('param-container'); // NEW
+        const paramContainer = document.getElementById('param-container');
 
         const btnRandomize = document.getElementById('btn-randomize'); 
         const btnDegree = document.getElementById('btn-degree'); 
@@ -218,11 +319,39 @@
         const statDead = document.getElementById('stat-dead');
         const statsBox = document.getElementById('stats-box');
 
+        const welcomeModal = document.getElementById('welcome-modal');
+        const modalContainer = document.getElementById('modal-container');
+        const btnHelp = document.getElementById('btn-help');
+
         const toolDescriptions = {
-            'gossip': "Spreads a colorful rumor through the network. Click a node to start a wave. Rumors fade over time but don't harm the nodes.",
-            'virus': "Spreads a deadly infection. Lethality sets the total probability a node dies. Survivors become Immune (Blue).",
+            'gossip': "Spreads a colorful rumor through the network. Click a node to start a wave. Rumors fade over time.",
+            'virus': "Spreads a viral infection. Lethality sets the probability a node dies. Survivors become immune (Blue).",
             'move': "Allows you to click and drag nodes to rearrange the network without triggering any new waves or infections."
         };
+
+        // --- POPULATE MODAL CONTENT DYNAMICALLY ---
+        function buildModal() {
+            let bulletsHTML = MODAL_TEXT.bulletPoints.map(point => `<li>${point}</li>`).join('');
+            
+            modalContainer.innerHTML = `
+                <h1>${MODAL_TEXT.title}</h1>
+                <p>${MODAL_TEXT.intro}</p>
+                <h3>${MODAL_TEXT.sectionHeading}</h3>
+                <ul>${bulletsHTML}</ul>
+                <p>${MODAL_TEXT.outro}</p>
+                <button id="btn-close-modal">${MODAL_TEXT.buttonLabel}</button>
+            `;
+
+            // Attach event listener to the newly created button
+            document.getElementById('btn-close-modal').addEventListener('click', () => {
+                welcomeModal.style.display = 'none';
+            });
+        }
+        buildModal();
+
+        btnHelp.addEventListener('click', () => {
+            welcomeModal.style.display = 'flex';
+        });
 
         slSpeed.addEventListener('input', (e) => valSpeed.textContent = parseFloat(e.target.value).toFixed(3));
         slPower.addEventListener('input', (e) => valPower.textContent = parseFloat(e.target.value).toFixed(2));
@@ -352,7 +481,7 @@
             toolInfo.textContent = toolDescriptions[currentTool];
 
             if (currentTool === 'virus') {
-                paramContainer.style.display = 'block'; // Ensure it's shown
+                paramContainer.style.display = 'block'; 
                 lblSpeedText.innerText = 'Infect Rate';
                 lblPowerText.innerText = 'Viral Load';
                 rowDecay.style.display = 'none'; 
@@ -360,7 +489,7 @@
                 toolInfo.style.borderLeftColor = '#ff4444'; 
                 statsBox.style.borderLeftColor = '#ff4444';
             } else if (currentTool === 'gossip') {
-                paramContainer.style.display = 'block'; // Ensure it's shown
+                paramContainer.style.display = 'block'; 
                 lblSpeedText.innerText = 'Rumor Speed';
                 lblPowerText.innerText = 'Rumor Reach';
                 rowDecay.style.display = 'flex'; 
@@ -368,7 +497,7 @@
                 toolInfo.style.borderLeftColor = '#555';
                 statsBox.style.borderLeftColor = '#555';
             } else if (currentTool === 'move') {
-                paramContainer.style.display = 'none'; // Hide the entire parameters section
+                paramContainer.style.display = 'none'; 
                 toolInfo.style.borderLeftColor = '#555';
                 statsBox.style.borderLeftColor = '#555';
             }
@@ -393,6 +522,8 @@
 
         // --- MOUSE EVENT LISTENERS ---
         canvas.addEventListener('mousedown', (e) => {
+            if (welcomeModal.style.display === 'flex') return;
+
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
